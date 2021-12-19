@@ -2,11 +2,11 @@ import java.util.Scanner;
 
 public class Anograms {
     static boolean isAnagram(String a, String b) {
+
         if (a.length() != b.length()) return false;
         a = a.toLowerCase();
         b = b.toLowerCase();
         for (int i = 0; i < a.length(); i++) {
-
             if (!a.contains(b.charAt(i)+"") || !b.contains(a.charAt(i)+"")) {
                 return false;
             }
@@ -18,6 +18,7 @@ public class Anograms {
         }
 
         return aInt == bInt;
+
     }
 
     public static void main(String[] args) {
@@ -28,6 +29,7 @@ public class Anograms {
         scan.close();
         boolean ret = isAnagram(a, b);
         System.out.println( (ret) ? "Anagrams" : "Not Anagrams" );
+
     }
 
 }
