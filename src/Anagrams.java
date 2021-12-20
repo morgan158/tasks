@@ -1,6 +1,12 @@
 import java.util.Scanner;
 
-public class Anograms {
+/**
+ * Надо вспомнить, что String - это объект.
+ * Надо вспомнить, как переопределяется equals и hashcode
+ * и зачем вообще переопределяют hashcode
+ */
+
+public class Anagrams {
     static boolean isAnagram(String a, String b) {
 
         if (a.length() != b.length()) return false;
