@@ -1,0 +1,133 @@
+package com.zina.space.job;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+
+
+import java.io.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+@Component
+@Slf4j
+@RequiredArgsConstructor(onConstructor = @__(@Autowired))
+public class ScanningFilesJob {
+
+    static File todayPatch;
+
+
+    @Scheduled(cron = "${space.jobs.scanning-files}")
+    public void sendAuditLogs() {
+
+        try {
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+            String TODAY = LocalDate.now().format(formatter);
+            String YESTERDAY = LocalDate.now().minusDays(1).format(formatter);
+            String FIND_RESULT_DIR = "/storage/upload/home/_find/";
+
+
+            File todayUploadFiles = new File(FIND_RESULT_DIR + File.separator + TODAY + ".txt");
+            File yesterdayUploadFiles = new File(FIND_RESULT_DIR + File.separator + YESTERDAY + ".txt");
+
+            toWriteToTodayFile(todayUploadFiles);
+            setTodayPatch(toDiffBetweenTodayAndYesterday(todayUploadFiles, yesterdayUploadFiles, TODAY, YESTERDAY));
+
+            log.info("scanning-files successfully done;");
+        } catch (Exception e) {
+            log.error("scanning-files", e);
+        }
+    }
+
+
+    private void toWriteToTodayFile(File todayUploadFiles){
+        File rootDir = new File("/"); // изменить
+        Queue<File> fileTree = new PriorityQueue<>();
+
+        Collections.addAll(fileTree, Objects.requireNonNull(rootDir.listFiles()));
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(todayUploadFiles))) {
+
+            while (!fileTree.isEmpty()) {
+                File currentFile = fileTree.remove();
+                if (currentFile.isDirectory()
+                        && currentFile.listFiles() != null
+                        && !currentFile.getAbsolutePath().equals("_find/mp3/|rdparse/appserver/transmitter/admin/user/processed-15.01.2019/")
+                        && !currentFile.getName().equals("cache")) {
+                    Collections.addAll(fileTree, Objects.requireNonNull(currentFile.listFiles()));
+                } else {
+                    writer.write(currentFile.getName());
+                    writer.newLine();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private File toDiffBetweenTodayAndYesterday(File todayFile, File yesterdayFile, String TODAY, String YESTERDAY) {
+        List<String> today = new ArrayList<>();
+        List<String> yesterday = new ArrayList<>();
+        List<String> diff = new ArrayList<>();
+
+        try (BufferedReader readerToday = new BufferedReader(new FileReader(todayFile));
+             BufferedReader readerYesterday = new BufferedReader(new FileReader(yesterdayFile))) {
+
+
+            while (readerToday.ready()) {
+                today.add(readerToday.readLine());
+            }
+            while (readerYesterday.ready()) {
+                yesterday.add(readerYesterday.readLine());
+            }
+
+            for (String value : yesterday) {
+                if (!today.contains(value)) { //если вчера был файл, а сегодня его нет
+                    diff.add("-" + value);
+                }
+            }
+            for (String s : today) {
+                if (!yesterday.contains(s)) { //если сегодня есть файл, а вчера его не было
+                    diff.add("+" + s);
+                }
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        File todayPatch = new File(TODAY + ".patch");
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(todayPatch))) {
+            writer.write("---- " + YESTERDAY + ".txt   " + LocalDateTime.now().minusDays(1)); // е совсем тот формат
+
+
+            writer.newLine();
+            writer.write("++++ " + TODAY + ".txt   " + LocalDateTime.now());
+            writer.newLine();
+            // не сделано - @@ -42651,0 +42652,18 @@ (размер файлов?)
+            for (String s : diff) {
+                writer.write(s);
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return todayPatch;
+    }
+
+    static public File getTodayPatch() {
+        return todayPatch;
+    }
+
+    static public void setTodayPatch(File patch) {
+        todayPatch = patch;
+    }
+}
